@@ -706,6 +706,69 @@
       return [...new Set(values.filter(Boolean))];
     }
 
+    const laneGroups = [
+      {
+        label: "Universities / Higher Ed",
+        value: "group:universities",
+        matches(entry) {
+          const blob = [
+            entry.lane,
+            entry.company,
+            entry.role,
+            entry.jd_summary,
+            entry.application_path,
+            entry.official_link,
+          ].join(" ").toLowerCase();
+          return /university|universities|higher ed|higher education|academic|campus|college|princeton\.icims|hr\.princeton|rutgers|princeton university/.test(blob);
+        },
+      },
+      {
+        label: "Financial / Asset Management",
+        value: "group:financial",
+        matches(entry) {
+          const blob = [entry.lane, entry.company, entry.role, entry.jd_summary].join(" ").toLowerCase();
+          return /financial|asset management|investment|portfolio|capital markets|treasury|bank|insurance|billing|settlement|reconciliation/.test(blob);
+        },
+      },
+      {
+        label: "Pharma / Life Sciences",
+        value: "group:pharma",
+        matches(entry) {
+          const blob = [entry.lane, entry.company, entry.role, entry.jd_summary].join(" ").toLowerCase();
+          return /pharma|life sciences|biotech|medical|healthcare|johnson|bristol|legend|bausch|integra|cosette|genscript|nestle health/.test(blob);
+        },
+      },
+      {
+        label: "Foreign-Owned / Multinational",
+        value: "group:foreign",
+        matches(entry) {
+          const blob = [entry.lane, entry.company, entry.role, entry.jd_summary, entry.resume_angle].join(" ").toLowerCase();
+          return /foreign-owned|multinational|cross-border|global|munich re|mizuho|aegon|transamerica|oracle/.test(blob);
+        },
+      },
+      {
+        label: "Nonprofit / Mission-Driven",
+        value: "group:nonprofit",
+        matches(entry) {
+          const blob = [entry.lane, entry.company, entry.role, entry.jd_summary].join(" ").toLowerCase();
+          return /nonprofit|mission|impact|foundation|tides|impactassets/.test(blob);
+        },
+      },
+    ];
+
+    function matchesLaneFilter(entry, value) {
+      if (value === "all") return true;
+      if (value.startsWith("group:")) {
+        const group = laneGroups.find(item => item.value === value);
+        return group ? group.matches(entry) : false;
+      }
+      return entry.lane === value;
+    }
+
+    function laneGroupCount(group) {
+      return allEntries.filter(entry => group.matches(entry)).length;
+    }
+
     function scoreClass(value) {
       if (value >= 8.5) return "high";
       if (value >= 7) return "mid";
@@ -720,8 +783,18 @@
       els.sectionFilter.innerHTML = '<option value="all">全部批次</option>' +
         sections.map(section => `<option value="${esc(section.title)}">${esc(section.title)} (${section.entries.length})</option>`).join("");
 
-      els.laneFilter.innerHTML = '<option value="all">全部赛道</option>' +
-        unique(allEntries.map(entry => entry.lane)).sort().map(lane => `<option value="${esc(lane)}">${esc(lane)}</option>`).join("");
+      const groupOptions = laneGroups
+        .map(group => `<option value="${esc(group.value)}">${esc(group.label)} (${laneGroupCount(group)})</option>`)
+        .join("");
+      const detailOptions = unique(allEntries.map(entry => entry.lane)).sort()
+        .map(lane => `<option value="${esc(lane)}">${esc(lane)}</option>`)
+        .join("");
+
+      els.laneFilter.innerHTML = `
+        <option value="all">全部赛道</option>
+        <optgroup label="大类汇总">${groupOptions}</optgroup>
+        <optgroup label="细分赛道">${detailOptions}</optgroup>
+      `;
     }
 
     function renderSummary() {
@@ -915,7 +988,7 @@
 
       let entries = allEntries.filter(entry => {
         if (sectionValue !== "all" && entry.section_title !== sectionValue) return false;
-        if (laneValue !== "all" && entry.lane !== laneValue) return false;
+        if (!matchesLaneFilter(entry, laneValue)) return false;
         if (entry.match_score_value < minScore) return false;
         if (sourceType !== "all" && entry.source_type !== sourceType) return false;
         if (contactNeed === "yes" && String(entry.contact_research_needed).toLowerCase() !== "yes") return false;
